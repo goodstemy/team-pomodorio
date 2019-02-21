@@ -1,12 +1,22 @@
 import kivy
+import os
+import urllib
+import json
 
 kivy.require('1.0.7')
 
+from dotenv import load_dotenv
 from kivy.app import App
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.clock import Clock
+from kivy.network.urlrequest import UrlRequest
+from kivy.uix.textinput import TextInput
+
+load_dotenv()
+
+TEAM_POMODORO_URI = os.getenv('TEAM_POMODORO_URI')
 
 class MainWindow(GridLayout):
     def __init__(self, **kwargs):
@@ -18,7 +28,9 @@ class MainWindow(GridLayout):
         self.cols = 1
         self.timer_label = Label(text='00:00')
         self.button = Button(text='Start', on_press=self.click_callback)
+        self.input = TextInput(text='Connect or create a team', multiline=False, on_text_validate=self.execute_connect)
 
+        self.add_widget(self.input)
         self.add_widget(self.timer_label)
         self.add_widget(self.button)
 
@@ -47,6 +59,15 @@ class MainWindow(GridLayout):
             self.timer_label.text = "00:{}".format(self.seconds)
         else:
             self.timer_label.text = "00:0{}".format(self.seconds)
+
+    def execute_connect(self, instance):
+        params = urllib.parse.urlencode({'name': instance.text})
+        headers = {'Content-type': 'application/x-www-form-urlencoded', 'Accept': 'text/plain'}
+        req = UrlRequest(TEAM_POMODORO_URI, on_success=self.successed_request, req_body=params, req_headers=headers)
+
+    def successed_request(self, req, result):
+        time = json.loads(result)
+        print(time['seconds'])
 
 class PomodoroApp(App):
     def build(self):
