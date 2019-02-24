@@ -17,6 +17,14 @@ from kivy.uix.textinput import TextInput
 load_dotenv()
 
 TEAM_POMODORO_URI = os.getenv('TEAM_POMODORO_URI')
+MINUTE_IN_SECONDS = 60
+PERIOD_TIME_IN_MINUTES = 25
+REST_TIME_IN_MINUTES = 5
+LONG_REST_IN_MINUTES = 15
+PERIOD_TIME_IN_SECONDS = PERIOD_TIME_IN_MINUTES * MINUTE_IN_SECONDS
+REST_TIME_IN_SECONDS = PERIOD_TIME_IN_MINUTES * MINUTE_IN_SECONDS
+LONG_REST_IN_SECONDS = LONG_REST_IN_MINUTES * MINUTE_IN_SECONDS
+MAX_PERIODS_COUNT = 4
 
 class MainWindow(GridLayout):
     def __init__(self, **kwargs):
@@ -27,6 +35,7 @@ class MainWindow(GridLayout):
         self.heartbeat_interval = None
         self.periods_count = 0
         self.is_rest = False
+        self.is_long_rest = False
 
         self.cols = 1
         self.timer_label = Label(text='00:00')
@@ -52,28 +61,65 @@ class MainWindow(GridLayout):
     def tick(self, dt):
         self.seconds += 1
 
-        if self.seconds >= 1500:
-            self.seconds = 0
-            self.is_rest = True
+        remaining_seconds = int(self.seconds % PERIOD_TIME_IN_SECONDS)
+        minutes = int(remaining_seconds / 60)
+        seconds = int(remaining_seconds % 60)
+        periods_without_long_rest = int(self.seconds / (PERIOD_TIME_IN_SECONDS + REST_TIME_IN_SECONDS))
+        long_rests_in_seconds = int(periods_without_long_rest / MAX_PERIODS_COUNT) * LONG_REST_IN_SECONDS
 
-        if self.seconds >= 300 and self.is_rest == True:
+        self.periods_count = int((self.seconds - long_rests_in_seconds) / (PERIOD_TIME_IN_SECONDS + REST_TIME_IN_SECONDS))
+
+        is_rest = (self.is_rest and self.is_long_rest)
+
+        if not is_rest and minutes == PERIOD_TIME_IN_MINUTES and self.periods_count % 4 == 0:
+            self.is_long_rest = True
             self.seconds = 0
-            self.periods_count += 1
+        elif not is_rest and minutes == PERIOD_TIME_IN_MINUTES:
+            self.is_rest = True
+            self.seconds = 0
+        elif is_rest and self.is_rest and not self.is_long_rest and minutes == REST_TIME_IN_MINUTES:
             self.is_rest = False
+            self.seconds = 0
+        elif is_rest and self.is_long_rest and not self.is_rest and minutes == LONG_REST_IN_MINUTES:
+            self.is_long_rest = False
+            self.seconds = 0
+
+        # print(periods_without_long_rest)
+        # print(long_rests_in_seconds)
+
+        print('total seconds', self.seconds)
+        print('periods', self.periods_count)
+        print('minutes', minutes)
+        print('seconds', seconds)
+        print('is rest', self.is_rest)
+        print('is long rest', self.is_long_rest)
+
+        # if self.seconds >= 1500:
+        #     self.seconds = 0
+        #     self.is_rest = True
+
+        # if self.seconds >= 300 and self.is_rest == True:
+        #     self.seconds = 0
+        #     self.periods_count += 1
+        #     self.is_rest = False
 
         self.display_time()
 
     def display_time(self):
+        if self.seconds == 0:
+            self.timer_label.text = '00:00'
+            return
+
         minutes = int(self.seconds / 60)
         seconds = self.seconds % 60
 
         if len(str(seconds)) == 1:
-            seconds = "0{}".format(seconds)
+            seconds = '0{}'.format(seconds)
 
         if len(str(minutes)) == 1:
-            minutes = "0{}".format(minutes)
+            minutes = '0{}'.format(minutes)
 
-        self.timer_label.text = "{}:{}".format(minutes, seconds)
+        self.timer_label.text = '{}:{}'.format(minutes, seconds)
 
     def execute_connect(self, instance):
         params = urllib.parse.urlencode({'name': instance.text})
@@ -89,7 +135,6 @@ class MainWindow(GridLayout):
         else:
             self.start_timer(0)
             print('you are create new room')
-
 
     def failure_request(self, req, error):
         print(error)
